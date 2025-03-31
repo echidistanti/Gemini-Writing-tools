@@ -95,43 +95,39 @@ function backupStorage() {
   });
 }
 
-// Funzione per esportare i settings
-function exportSettings() {
-  chrome.storage.sync.get(['apiKey', 'customPrompts'], function(items) {
-    if (chrome.runtime.lastError) {
-      console.error('Errore nel recupero dei settings:', chrome.runtime.lastError);
-      alert('Errore nel recupero dei settings');
-      return;
-    }
-    
+// Export function - simplified for JSON
+async function exportSettings() {
+  try {
+    const settings = await chrome.storage.sync.get(['apiKey', 'customPrompts']);
     const exportData = {
-      customPrompts: items.customPrompts || [],
-      apiKey: items.apiKey || ''
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      settings: {
+        customPrompts: settings.customPrompts || [],
+        apiKey: settings.apiKey || ''
+      }
     };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
     const url = URL.createObjectURL(blob);
+    
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gpt-helper-settings.json';
+    a.download = `ai-text-tools-settings-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
     a.click();
+    
     URL.revokeObjectURL(url);
-  });
-}
-
-// Funzione per convertire JSON in XML
-function jsonToXml(json) {
-  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<settings>\n';
-  for (const key in json) {
-    if (json.hasOwnProperty(key)) {
-      xml += `  <${key}>${JSON.stringify(json[key])}</${key}>\n`;
-    }
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error('Export failed:', error);
+    alert(getMessage('errorExportingSettings'));
   }
-  xml += '</settings>';
-  return xml;
 }
 
-// Funzione per importare i settings
+// Import function - simplified for JSON
 async function importSettings(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -139,58 +135,29 @@ async function importSettings(event) {
   try {
     const text = await file.text();
     const importedData = JSON.parse(text);
-    
-    // Validazione dei dati importati
-    if (!importedData || typeof importedData !== 'object') {
-      throw new Error('File di configurazione non valido');
+
+    // Validate imported data structure
+    if (!importedData.settings || !Array.isArray(importedData.settings.customPrompts)) {
+      throw new Error(getMessage('invalidFileFormat'));
     }
 
-    // Verifica e salva solo i campi conosciuti
-    const settingsToSave = {};
-    
-    if (Array.isArray(importedData.customPrompts)) {
-      settingsToSave.customPrompts = importedData.customPrompts;
-    }
-    
-    if (typeof importedData.apiKey === 'string') {
-      settingsToSave.apiKey = importedData.apiKey;
-    }
+    // Save to storage
+    await chrome.storage.sync.set({
+      customPrompts: importedData.settings.customPrompts,
+      apiKey: importedData.settings.apiKey || ''
+    });
 
-    // Salva le impostazioni
-    await chrome.storage.sync.set(settingsToSave);
-    
-    // Ricarica le impostazioni
+    // Reload settings and update UI
     await loadSettings();
-    
-    // Notifica il background script
     await chrome.runtime.sendMessage({ action: 'reloadConfig' });
     
-    alert('Impostazioni importate con successo!');
-    
-    // Reset del campo file
-    event.target.value = '';
-    
+    alert(getMessage('importSuccess'));
+    event.target.value = ''; // Reset file input
   } catch (error) {
-    console.error('Errore nell\'importazione delle impostazioni:', error);
-    alert('Errore nell\'importazione delle impostazioni: ' + error.message);
+    console.error('Import failed:', error);
+    alert(getMessage('errorImportingSettings'));
   }
 }
-
-// Funzione per convertire XML in JSON
-function xmlToJson(xml) {
-  const obj = {};
-  const settings = xml.getElementsByTagName('settings')[0];
-  for (const node of settings.children) {
-    obj[node.nodeName] = JSON.parse(node.textContent);
-  }
-  return obj;
-}
-
-// Esempio di utilizzo
-getCustomPrompts(function(prompts) {
-  console.log('Prompts recuperati:', prompts);
-  // Puoi fare qualcosa con i prompt recuperati qui
-});
 
 // API Key functions
 function showApiKeyStatus() {
@@ -512,7 +479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (importButton) {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = '.xml';
+    fileInput.accept = '.json';  // Changed from .xml to .json
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
 
