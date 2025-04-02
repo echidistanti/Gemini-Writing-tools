@@ -38,7 +38,7 @@ function createContextMenus() {
     // Create main menu
     chrome.contextMenus.create({
       id: 'gpt-menu',
-      title: chrome.i18n.getMessage('contextMenuTitle') || 'GPT Helper',
+      title: 'GPT Helper', // stringa statica in plain english
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -126,7 +126,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const promptText = prompt(promptMessage);
         return promptText;
       },
-      args: [chrome.i18n.getMessage('enterCustomPrompt')]
+      args: ['Enter your custom prompt']
     }, async (results) => {
       const promptText = results[0].result;
       if (promptText && promptText.trim()) {
@@ -316,14 +316,14 @@ async function processText(text, promptText, tab) {
     });
   } catch (error) {
     console.error('Processing error:', error);
-    showAlert(tab, `${chrome.i18n.getMessage('errorProcessingText')}: ${error.message}`);
+    showAlert(tab, `Error processing text: ${error.message}`);
   }
 }
 
 // Utility functions
 function validateInput(text, tab) {
   if (!text?.trim()) {
-    showAlert(tab, chrome.i18n.getMessage('noTextSelected'));
+    showAlert(tab, 'No text selected');
     return false;
   }
 

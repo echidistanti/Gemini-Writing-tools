@@ -1,6 +1,12 @@
-# GPT Writing Tools
+# Gemini Writing Tools
 
-A powerful Chrome extension that enhances your writing experience by leveraging OpenAI's GPT models. Process selected text with custom prompts, get instant AI-powered responses, and engage in contextual chat conversations.
+## Simplified Writing Assistance
+
+Gemini Writing Tools is a Chrome extension that offers straightforward support for writing. Designed for ease of use, this extension provides helpful text analysis and suggestions directly within your browser.
+
+To install the extension, download the project and load it as an unpacked extension in Chrome by enabling Developer Mode and selecting the project folder. Configure your API key and custom prompts via the settings page once installed.
+
+To use Gemini Writing Tools, simply select text on any webpage and access the extension through the context menu. The extension will analyze the text and display the results directly in your browser.
 
 ## 🌟 Key Features
 
@@ -15,7 +21,7 @@ A powerful Chrome extension that enhances your writing experience by leveraging 
 
 ### Prerequisites
 - Google Chrome browser
-- OpenAI API key ([Get one here](https://platform.openai.com/api-keys))
+- Gemini API key ([Get one here](https://ai.dev))
 
 ### Installation
 1. Clone this repository or download the source code

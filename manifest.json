@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "__MSG_extName__",
-  "description": "__MSG_extDescription__",
+  "name": "Gemini Writing Tools", 
+  "description": "A simplified writing tool extension in plain english.",
   "version": "1.0",
-  "default_locale": "en",
   "permissions": [
     "storage",
     "contextMenus",
@@ -27,7 +26,7 @@
   },
   "options_page": "options.html",
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "web_accessible_resources": [{
     "resources": ["styles/*"],

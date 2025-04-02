@@ -5,17 +5,6 @@ let hasUnsavedChanges = false;
 let dragSource = null;
 
 // Utility Functions
-function getMessage(key) {
-  return chrome.i18n.getMessage(key) || key;
-}
-
-function initializeI18n() {
-  document.querySelectorAll('[data-i18n]').forEach(element => {
-    const key = element.getAttribute('data-i18n');
-    element.textContent = getMessage(key);
-  });
-}
-
 function estimateTokens(text) {
   return Math.ceil(text.length / 4);
 }
@@ -123,7 +112,7 @@ async function exportSettings() {
     document.body.removeChild(a);
   } catch (error) {
     console.error('Export failed:', error);
-    alert(getMessage('errorExportingSettings'));
+    alert('Error exporting settings');
   }
 }
 
@@ -132,13 +121,19 @@ async function importSettings(event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  // Ensure the file is JSON by checking its type or extension
+  if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+    alert('Please select a valid JSON file.');
+    return;
+  }
+
   try {
     const text = await file.text();
     const importedData = JSON.parse(text);
 
     // Validate imported data structure
     if (!importedData.settings || !Array.isArray(importedData.settings.customPrompts)) {
-      throw new Error(getMessage('invalidFileFormat'));
+      throw new Error('Invalid file format');
     }
 
     // Save to storage
@@ -151,11 +146,11 @@ async function importSettings(event) {
     await loadSettings();
     await chrome.runtime.sendMessage({ action: 'reloadConfig' });
     
-    alert(getMessage('importSuccess'));
+    alert('Import success');
     event.target.value = ''; // Reset file input
   } catch (error) {
     console.error('Import failed:', error);
-    alert(getMessage('errorImportingSettings'));
+    alert('Error importing settings');
   }
 }
 
@@ -196,7 +191,7 @@ async function loadSettings() {
     updateSaveButtonState();
   } catch (error) {
     console.error('Error loading settings:', error);
-    alert(getMessage('errorLoadingSettings'));
+    alert('Error loading settings');
   }
 }
 
@@ -256,7 +251,7 @@ function updatePromptsTable() {
                class="prompt-input">
       </td>
       <td>
-        <button class="button delete" data-id="${prompt.id}">${getMessage('buttonDelete')}</button>
+        <button class="button delete" data-id="${prompt.id}">Delete</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -354,30 +349,25 @@ function updatePrompt(id, field, value) {
 }
 
 function addNewPrompt() {
-  // Assicuriamoci che prompts sia un array
-  if (!Array.isArray(prompts)) {
-    prompts = [];
-  }
-
-  // Gestione sicura dell'ID quando non ci sono prompt
+  // Gestione sicura dell'ID
   const maxId = prompts.length > 0 
     ? prompts.reduce((max, p) => Math.max(max, p.id || 0), 0) 
     : 0;
 
   const newPrompt = {
     id: maxId + 1,
-    name: getMessage('newPromptName'),
-    prompt: getMessage('newPromptText')
+    name: 'New Prompt',       // testo statico in plain english
+    prompt: 'Enter your prompt here' // testo statico in plain english
   };
 
-  prompts.push(newPrompt); // Usiamo push invece dello spread operator
+  prompts.push(newPrompt);
   hasUnsavedChanges = true;
   updatePromptsTable();
   updateSaveButtonState();
 }
 
 function deletePrompt(id) {
-  if (confirm(getMessage('confirmDelete'))) {
+  if (confirm('Are you sure you want to delete this prompt?')) {
     prompts = prompts.filter(p => p.id !== id);
     hasUnsavedChanges = true;
     updatePromptsTable();
@@ -413,7 +403,7 @@ async function savePrompts() {
     showSaveStatus();
   } catch (error) {
     console.error('Error saving prompts:', error);
-    alert(getMessage('errorSavingPrompts') + ': ' + error.message);
+    alert('Error saving prompts: ' + error.message);
   }
 }
 
@@ -442,7 +432,8 @@ function setupEventListeners() {
   const savePromptsButton = document.getElementById('savePrompts');
   const saveApiKeyButton = document.getElementById('saveApiKey');
   const exportSettingsButton = document.getElementById('exportSettings');
-  const importSettingsButton = document.getElementById('importSettings');
+  const importSettingsButton = document.getElementById('importSettings'); // the visible button
+  const importFileInput = document.getElementById('importFile'); // the hidden file input
 
   if (saveApiKeyButton) {
     saveApiKeyButton.addEventListener('click', saveApiKey);
@@ -464,32 +455,17 @@ function setupEventListeners() {
     exportSettingsButton.addEventListener('click', exportSettings);
   }
 
-  if (importSettingsButton) {
-    importSettingsButton.addEventListener('change', importSettings);
+  if (importSettingsButton && importFileInput) {
+    importSettingsButton.addEventListener('click', () => {
+      importFileInput.click();
+    });
+    importFileInput.addEventListener('change', importSettings);
   }
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-  initializeI18n();
   await loadSettings();
-
-  // Import button handler
-  const importButton = document.getElementById('importSettings');
-  if (importButton) {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';  // Changed from .xml to .json
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
-
-    importButton.addEventListener('click', () => {
-      fileInput.click();
-    });
-
-    fileInput.addEventListener('change', importSettings);
-  }
-
   setupEventListeners();
 });
 
@@ -500,6 +476,3 @@ window.addEventListener('beforeunload', (e) => {
     e.returnValue = '';
   }
 });
-
-// Initialize translations
-initializeI18n();
