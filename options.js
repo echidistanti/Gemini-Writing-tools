@@ -121,8 +121,8 @@ async function importSettings(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  // Ensure the file is JSON by checking its type or extension
-  if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+  // Check file type and extension
+  if (file.type !== 'application/json' && !file.name.toLowerCase().endsWith('.json')) {
     alert('Please select a valid JSON file.');
     return;
   }
@@ -131,26 +131,25 @@ async function importSettings(event) {
     const text = await file.text();
     const importedData = JSON.parse(text);
 
-    // Validate imported data structure
-    if (!importedData.settings || !Array.isArray(importedData.settings.customPrompts)) {
+    // Validate the structure of the imported data
+    if (!importedData.settings || typeof importedData.settings !== 'object') {
       throw new Error('Invalid file format');
     }
 
-    // Save to storage
+    // Save settings to chrome.storage
     await chrome.storage.sync.set({
-      customPrompts: importedData.settings.customPrompts,
-      apiKey: importedData.settings.apiKey || ''
+      apiKey: importedData.settings.apiKey || '',
+      customPrompts: importedData.settings.customPrompts || []
     });
 
-    // Reload settings and update UI
+    // Reload settings and update UI if needed
     await loadSettings();
-    await chrome.runtime.sendMessage({ action: 'reloadConfig' });
-    
-    alert('Import success');
-    event.target.value = ''; // Reset file input
+
+    alert('Import successful');
+    event.target.value = ''; // Reset file input value
   } catch (error) {
-    console.error('Import failed:', error);
-    alert('Error importing settings');
+    console.error('Error importing settings:', error);
+    alert('Error importing settings: ' + error.message);
   }
 }
 
