@@ -1,5 +1,5 @@
 // Configuration
-const DEFAULT_MODEL = 'gemini-2.0-flash-lite';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 const CONFIG = {
   MAX_TOKENS: 4000,
   getApiEndpoint: (model) => `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
