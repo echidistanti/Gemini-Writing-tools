@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Writing Tools", 
+  "description": "A simplified writing tool extension in plain english.",
+  "version": "1.0",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "<all_urls>"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": "icons/icon48.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
+  "web_accessible_resources": [{
+    "resources": ["styles/*"],
+    "matches": ["<all_urls>"]
+  }]
+}
