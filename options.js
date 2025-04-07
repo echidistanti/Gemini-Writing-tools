@@ -433,10 +433,10 @@ function showSaveStatus() {
 // Function to fetch available models from the Gemini API
 async function fetchAvailableModels() {
   try {
-    const apiKey = await getApiKey(); // Ottieni la API key dallo storage
+    const apiKey = await getApiKey();
     if (!apiKey) {
       console.warn('API key not found. Please set it in the options.');
-      return []; // Restituisci un array vuoto se la API key non è impostata
+      return [];
     }
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -445,10 +445,13 @@ async function fetchAvailableModels() {
     }
     const data = await response.json();
 
-    // Assuming the API returns a list of models in the 'models' field
     if (data && Array.isArray(data.models)) {
-      // Extract only the model names from the response
-      const modelNames = data.models.map(model => model.name);
+      // Extract model names and remove the "models/" prefix
+      const modelNames = data.models.map(model => {
+        const name = model.name;
+        return name.startsWith('models/') ? name.substring(7) : name;
+      });
+      console.log('Available models:', modelNames);
       return modelNames;
     } else {
       console.error('Invalid model list format:', data);

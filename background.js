@@ -1,9 +1,10 @@
 // Configuration
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-pro';  // Changed from gemini-2.0-flash
 const CONFIG = {
   MAX_TOKENS: 4000,
-  getApiEndpoint: (model) => `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
-  TOKEN_RATIO: 4
+  getApiEndpoint: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,  // Changed to v1beta
+  TOKEN_RATIO: 4,
+  AVAILABLE_MODELS: ['gemini-pro', 'gemini-pro-vision']  // Add available models list
 };
 
 // Extension state
@@ -247,15 +248,30 @@ async function processText(text, promptText, tab) {
           parts: [{
             text: `${promptText}\n\nInput: ${text}`
           }]
-        }]
+        }],
+        safetySettings: [],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
       })
     });
 
-    const result = await response.json();
-    
     if (!response.ok) {
-      throw new Error(result.error?.message || 'API request failed');
+      // Log the error response
+      const errorBody = await response.text();
+      console.error('API error response:', {
+        status: response.status,
+        body: errorBody,
+        endpoint: CONFIG.getApiEndpoint(modelToUse),
+        model: modelToUse
+      });
+      throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
     }
+
+    const result = await response.json();
 
     // Extract response from Gemini format
     const generatedText = result.candidates[0].content.parts[0].text;
@@ -423,6 +439,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Unified chat window implementation
 async function showChatWindow(tab, initialMessage = '', initialResponse = '') {
   try {
+    // Get current state before injecting script
+    const currentModel = state.selectedModel || DEFAULT_MODEL;
+
     await chrome.scripting.insertCSS({
       target: { tabId: tab.id },
       files: ['styles/result.css']
@@ -637,9 +656,9 @@ async function showChatWindow(tab, initialMessage = '', initialResponse = '') {
           color: 'var(--gpt-text-color)'
         });
 
-        // Add model name
+        // Add model name (now using params.currentModel)
         const modelName = document.createElement('div');
-        modelName.textContent = `Model: ${state.selectedModel || DEFAULT_MODEL}`;
+        modelName.textContent = `Model: ${params.currentModel}`;
         Object.assign(modelName.style, {
           fontSize: '10px',
           color: '#999',
@@ -934,6 +953,7 @@ async function showChatWindow(tab, initialMessage = '', initialResponse = '') {
         overlayEnabled,
         initialMessage: initialMessage,
         initialResponse: initialResponse,
+        currentModel: currentModel, // Pass the model info through args
         i18n: {
           chatPlaceholder: chrome.i18n.getMessage('chatPlaceholder'),
           errorCopying: chrome.i18n.getMessage('errorCopying')
