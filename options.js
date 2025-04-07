@@ -4,6 +4,9 @@ let originalPrompts = [];
 let hasUnsavedChanges = false;
 let dragSource = null;
 
+// State variable for the selected model
+let selectedModel = '';
+
 // Utility Functions
 function estimateTokens(text) {
   return Math.ceil(text.length / 4);
@@ -169,6 +172,7 @@ function showApiKeyStatus() {
 // Load and Save functions
 async function loadSettings() {
   try {
+    await loadSelectedModel(); // Load the selected model first
     const result = await chrome.storage.sync.get(['apiKey', 'customPrompts']);
     console.log('Loading settings:', result);
 
@@ -424,6 +428,92 @@ function showSaveStatus() {
   }
 }
 
+// Function to fetch available models from the Gemini API
+async function fetchAvailableModels() {
+  try {
+    const apiKey = await getApiKey(); // Ottieni la API key dallo storage
+    if (!apiKey) {
+      console.warn('API key not found. Please set it in the options.');
+      return []; // Restituisci un array vuoto se la API key non è impostata
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+
+    // Assuming the API returns a list of models in the 'models' field
+    if (data && Array.isArray(data.models)) {
+      // Extract only the model names from the response
+      const modelNames = data.models.map(model => model.name);
+      return modelNames;
+    } else {
+      console.error('Invalid model list format:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch available models:', error);
+    return [];
+  }
+}
+
+// Helper function to get the API key from storage
+async function getApiKey() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['apiKey'], (result) => {
+      resolve(result.apiKey || '');
+    });
+  });
+}
+
+// Function to populate the model selection dropdown
+async function populateModelDropdown() {
+  const modelSelect = document.getElementById('modelSelect');
+  if (!modelSelect) return;
+
+  const models = await fetchAvailableModels();
+
+  models.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    modelSelect.appendChild(option);
+  });
+
+  // Set the selected model after populating the dropdown
+  if (selectedModel) {
+    modelSelect.value = selectedModel;
+  }
+}
+
+// Function to save the selected model
+async function saveSelectedModel() {
+  const modelSelect = document.getElementById('modelSelect');
+  if (!modelSelect) return;
+
+  selectedModel = modelSelect.value;
+  try {
+    await chrome.storage.sync.set({ selectedModel: selectedModel });
+    console.log('Selected model saved:', selectedModel);
+    showSaveStatus(); // Optional: Show a save confirmation message
+  } catch (error) {
+    console.error('Error saving selected model:', error);
+    alert('Error saving selected model');
+  }
+}
+
+// Function to load the selected model from storage
+async function loadSelectedModel() {
+  try {
+    const result = await chrome.storage.sync.get(['selectedModel']);
+    selectedModel = result.selectedModel || '';
+    console.log('Loaded selected model:', selectedModel);
+  } catch (error) {
+    console.error('Error loading selected model:', error);
+  }
+}
+
 // Event Listeners Setup
 function setupEventListeners() {
   const apiKeyInput = document.getElementById('apiKey');
@@ -433,6 +523,7 @@ function setupEventListeners() {
   const exportSettingsButton = document.getElementById('exportSettings');
   const importSettingsButton = document.getElementById('importSettings'); // the visible button
   const importFileInput = document.getElementById('importFile'); // the hidden file input
+  const modelSelect = document.getElementById('modelSelect');
 
   if (saveApiKeyButton) {
     saveApiKeyButton.addEventListener('click', saveApiKey);
@@ -460,12 +551,17 @@ function setupEventListeners() {
     });
     importFileInput.addEventListener('change', importSettings);
   }
+
+  if (modelSelect) {
+    modelSelect.addEventListener('change', saveSelectedModel);
+  }
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
   setupEventListeners();
+  await populateModelDropdown(); // Populate the dropdown after loading settings and setting up listeners
 });
 
 // Confirm before leaving with unsaved changes
