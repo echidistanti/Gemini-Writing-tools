@@ -3,8 +3,6 @@ let prompts = [];
 let originalPrompts = [];
 let hasUnsavedChanges = false;
 let dragSource = null;
-
-// State variable for the selected model
 let selectedModel = '';
 
 // Utility Functions
