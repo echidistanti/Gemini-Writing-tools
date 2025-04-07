@@ -1,36 +1,26 @@
 // State variables
-let prompts = [];
-let originalPrompts = [];
-let hasUnsavedChanges = false;
+const State = {
+  prompts: [],
+  originalPrompts: [],
+  hasUnsavedChanges: false,
+  selectedModel: '',
+  
+  setPrompts(newPrompts) {
+    this.prompts = newPrompts;
+    this.hasUnsavedChanges = true;
+    updateSaveButtonState();
+    updatePromptsTable();
+  },
+  
+  resetChanges() {
+    this.hasUnsavedChanges = false;
+    updateSaveButtonState();
+  }
+};
+
 let dragSource = null;
-let selectedModel = '';
 
 // Utility Functions
-function estimateTokens(text) {
-  return Math.ceil(text.length / 4);
-}
-
-function showTokenCounter(text) {
-  let tokenCounter = document.querySelector('.token-counter');
-  if (!tokenCounter) {
-    tokenCounter = document.createElement('div');
-    tokenCounter.className = 'token-counter';
-    document.body.appendChild(tokenCounter);
-  }
-
-  const tokens = estimateTokens(text);
-  const maxTokens = 4000;
-
-  tokenCounter.className = 'token-counter';
-  if (tokens > maxTokens) {
-    tokenCounter.classList.add('error');
-  } else if (tokens > maxTokens * 0.8) {
-    tokenCounter.classList.add('warning');
-  }
-
-  tokenCounter.textContent = `Tokens: ${tokens}/${maxTokens}`;
-}
-
 function createUniqueElement(tag, id) {
   let element = document.getElementById(id);
   if (!element) {
@@ -40,35 +30,21 @@ function createUniqueElement(tag, id) {
   return element;
 }
 
-// Funzione per salvare i prompt custom
-function saveCustomPrompts(prompts) {
-  chrome.storage.sync.set({ customPrompts: prompts }, function() {
-    if (chrome.runtime.lastError) {
-      console.error('Errore nel salvataggio dei prompt custom:', chrome.runtime.lastError);
-    } else {
-      console.log('Prompt custom salvati nello storage sync.');
-    }
-  });
-}
-
-// Funzione per recuperare i prompt custom
-function getCustomPrompts(callback) {
-  chrome.storage.sync.get(['customPrompts'], function(result) {
-    if (chrome.runtime.lastError) {
-      console.error('Errore nel recupero dei prompt custom:', chrome.runtime.lastError);
-    } else {
-      console.log('Prompt custom recuperati dallo storage sync:', result.customPrompts);
-      callback(result.customPrompts || []);
-    }
-  });
-}
-
-// Funzione per sincronizzare i prompt custom
-function syncCustomPrompts() {
-  chrome.storage.sync.set({ customPrompts: prompts }, function() {
-    console.log('Prompt custom sincronizzati nello storage sync.');
-    alert('Prompt custom sincronizzati con successo!');
-  });
+// Replace multiple prompt storage functions with a single one
+async function handlePrompts(action, data = null) {
+  switch(action) {
+    case 'save':
+      await Storage.set({ customPrompts: State.prompts });
+      State.originalPrompts = JSON.parse(JSON.stringify(State.prompts));
+      State.resetChanges();
+      break;
+    case 'load':
+      const result = await Storage.get(['customPrompts']);
+      return result.customPrompts || [];
+    case 'sync':
+      await Storage.set({ customPrompts: State.prompts });
+      return State.prompts;
+  }
 }
 
 // Funzione per mostrare il contenuto dello storage
@@ -182,14 +158,14 @@ async function loadSettings() {
     }
 
     // Inizializzazione più robusta dell'array prompts
-    prompts = Array.isArray(result.customPrompts) ? result.customPrompts : [];
+    State.setPrompts(Array.isArray(result.customPrompts) ? result.customPrompts : []);
     
     // Se non ci sono prompt, inizializziamo con un array vuoto
     if (!Array.isArray(result.customPrompts)) {
       await chrome.storage.sync.set({ customPrompts: [] });
     }
 
-    originalPrompts = JSON.parse(JSON.stringify(prompts));
+    State.originalPrompts = JSON.parse(JSON.stringify(State.prompts));
     updatePromptsTable();
     updateSaveButtonState();
   } catch (error) {
@@ -225,13 +201,13 @@ function updatePromptsTable() {
 
   tbody.innerHTML = '';
 
-  prompts.forEach((prompt, index) => {
+  State.prompts.forEach((prompt, index) => {
     const tr = document.createElement('tr');
     tr.className = 'prompt-row';
     tr.draggable = true;
     tr.dataset.id = prompt.id;
 
-    const originalPrompt = originalPrompts.find(p => p.id === prompt.id);
+    const originalPrompt = State.originalPrompts.find(p => p.id === prompt.id);
     const isModified = originalPrompt && (originalPrompt.name !== prompt.name || originalPrompt.prompt !== prompt.prompt);
 
     if (isModified) {
@@ -273,7 +249,6 @@ function updatePromptsTable() {
       const id = parseInt(this.dataset.id);
       const field = this.dataset.field;
       updatePrompt(id, field, this.value);
-      showTokenCounter(this.value);
     });
   });
 
@@ -319,10 +294,10 @@ function handleDrop(e) {
     const sourceIndex = allRows.indexOf(dragSource);
     const targetIndex = allRows.indexOf(this);
 
-    const [removed] = prompts.splice(sourceIndex, 1);
-    prompts.splice(targetIndex, 0, removed);
+    const [removed] = State.prompts.splice(sourceIndex, 1);
+    State.prompts.splice(targetIndex, 0, removed);
 
-    hasUnsavedChanges = true;
+    State.hasUnsavedChanges = true;
     updatePromptsTable();
     updateSaveButtonState();
   }
@@ -340,21 +315,21 @@ function handleDragLeave(e) {
 
 // Prompt Management Functions
 function updatePrompt(id, field, value) {
-  const promptIndex = prompts.findIndex(p => p.id === id);
+  const promptIndex = State.prompts.findIndex(p => p.id === id);
   if (promptIndex !== -1) {
-    prompts[promptIndex] = {
-      ...prompts[promptIndex],
+    State.prompts[promptIndex] = {
+      ...State.prompts[promptIndex],
       [field]: value
     };
-    hasUnsavedChanges = true;
+    State.hasUnsavedChanges = true;
     updateSaveButtonState();
   }
 }
 
 function addNewPrompt() {
   // Gestione sicura dell'ID
-  const maxId = prompts.length > 0 
-    ? prompts.reduce((max, p) => Math.max(max, p.id || 0), 0) 
+  const maxId = State.prompts.length > 0 
+    ? State.prompts.reduce((max, p) => Math.max(max, p.id || 0), 0) 
     : 0;
 
   const newPrompt = {
@@ -363,44 +338,37 @@ function addNewPrompt() {
     prompt: 'Enter your prompt here' // testo statico in plain english
   };
 
-  prompts.push(newPrompt);
-  hasUnsavedChanges = true;
+  State.prompts.push(newPrompt);
+  State.hasUnsavedChanges = true;
   updatePromptsTable();
   updateSaveButtonState();
 }
 
 function deletePrompt(id) {
   if (confirm('Are you sure you want to delete this prompt?')) {
-    prompts = prompts.filter(p => p.id !== id);
-    hasUnsavedChanges = true;
+    State.prompts = State.prompts.filter(p => p.id !== id);
+    State.hasUnsavedChanges = true;
     updatePromptsTable();
     updateSaveButtonState();
   }
 }
 
-// Save Functions
+function validatePrompt(prompt) {
+  return prompt &&
+    typeof prompt.id === 'number' &&
+    typeof prompt.name === 'string' &&
+    typeof prompt.prompt === 'string' &&
+    prompt.name.trim() !== '' &&
+    prompt.prompt.trim() !== '';
+}
+
 async function savePrompts() {
   try {
-    // Validazione dei dati prima del salvataggio
-    if (!Array.isArray(prompts)) {
-      throw new Error('Prompts must be an array');
+    if (!Array.isArray(State.prompts) || !State.prompts.every(validatePrompt)) {
+      throw new Error('Invalid prompts format');
     }
 
-    // Verifica che ogni prompt abbia i campi richiesti
-    const validPrompts = prompts.every(p => 
-      p && typeof p.id === 'number' && 
-      typeof p.name === 'string' && 
-      typeof p.prompt === 'string'
-    );
-
-    if (!validPrompts) {
-      throw new Error('Invalid prompt format');
-    }
-
-    console.log('Saving prompts:', prompts);
-    await chrome.storage.sync.set({ customPrompts: prompts });
-    originalPrompts = JSON.parse(JSON.stringify(prompts));
-    hasUnsavedChanges = false;
+    await handlePrompts('save');
     updatePromptsTable();
     updateSaveButtonState();
     showSaveStatus();
@@ -413,8 +381,8 @@ async function savePrompts() {
 function updateSaveButtonState() {
   const saveButton = document.getElementById('savePrompts');
   if (saveButton) {
-    saveButton.disabled = !hasUnsavedChanges;
-    saveButton.style.opacity = hasUnsavedChanges ? '1' : '0.5';
+    saveButton.disabled = !State.hasUnsavedChanges;
+    saveButton.style.opacity = State.hasUnsavedChanges ? '1' : '0.5';
   }
 }
 
@@ -428,135 +396,82 @@ function showSaveStatus() {
   }
 }
 
-// Function to fetch available models from the Gemini API
-async function fetchAvailableModels() {
-  try {
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      console.warn('API key not found. Please set it in the options.');
-      return [];
-    }
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-
-    if (data && Array.isArray(data.models)) {
-      // Extract model names and remove the "models/" prefix
-      const modelNames = data.models.map(model => {
-        const name = model.name;
-        return name.startsWith('models/') ? name.substring(7) : name;
-      });
-      console.log('Available models:', modelNames);
-      return modelNames;
-    } else {
-      console.error('Invalid model list format:', data);
-      return [];
-    }
-  } catch (error) {
-    console.error('Failed to fetch available models:', error);
-    return [];
-  }
-}
-
-// Helper function to get the API key from storage
-async function getApiKey() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(['apiKey'], (result) => {
-      resolve(result.apiKey || '');
+// Unified storage functions
+const Storage = {
+  async get(keys) {
+    return new Promise(resolve => {
+      chrome.storage.sync.get(keys, resolve);
     });
-  });
-}
+  },
+  
+  async set(data) {
+    return new Promise(resolve => {
+      chrome.storage.sync.set(data, resolve);
+    });
+  }
+};
 
-// Function to populate the model selection dropdown
-async function populateModelDropdown() {
-  const modelSelect = document.getElementById('modelSelect');
-  if (!modelSelect) return;
+async function handleModel(action, modelData = null) {
+  const apiKey = await Storage.get(['apiKey']).then(result => result.apiKey);
+  if (!apiKey) {
+    console.warn('API key not found');
+    return null;
+  }
 
-  const models = await fetchAvailableModels();
-
-  models.forEach(model => {
-    const option = document.createElement('option');
-    option.value = model;
-    option.textContent = model;
-    modelSelect.appendChild(option);
-  });
-
-  // Set the selected model after populating the dropdown
-  if (selectedModel) {
-    modelSelect.value = selectedModel;
+  switch(action) {
+    case 'fetch':
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+        );
+        const data = await response.json();
+        return data?.models?.map(model => 
+          model.name.startsWith('models/') ? model.name.substring(7) : model.name
+        ) || [];
+      } catch (error) {
+        console.error('Failed to fetch models:', error);
+        return [];
+      }
+      
+    case 'save':
+      await Storage.set({ selectedModel: modelData });
+      State.selectedModel = modelData; // Aggiorna lo stato
+      showSaveStatus(); // Mostra feedback di salvataggio
+      return modelData;
   }
 }
 
-// Function to save the selected model
-async function saveSelectedModel() {
-  const modelSelect = document.getElementById('modelSelect');
-  if (!modelSelect) return;
+// Correzione nel eventMap
+const eventMap = {
+  'apiKey': { event: 'change', handler: saveApiKey },
+  'addPrompt': { event: 'click', handler: addNewPrompt },
+  'savePrompts': { event: 'click', handler: savePrompts },
+  'modelSelect': { 
+    event: 'change', 
+    handler: function() {
+      const modelSelect = document.getElementById('modelSelect');
+      if (modelSelect) {
+        handleModel('save', modelSelect.value);
+      }
+    }
+  },
+  'exportSettings': { event: 'click', handler: exportSettings }
+};
 
-  selectedModel = modelSelect.value;
-  try {
-    await chrome.storage.sync.set({ selectedModel: selectedModel });
-    console.log('Selected model saved:', selectedModel);
-    showSaveStatus(); // Optional: Show a save confirmation message
-  } catch (error) {
-    console.error('Error saving selected model:', error);
-    alert('Error saving selected model');
-  }
-}
-
-// Function to load the selected model from storage
-async function loadSelectedModel() {
-  try {
-    const result = await chrome.storage.sync.get(['selectedModel']);
-    selectedModel = result.selectedModel || '';
-    console.log('Loaded selected model:', selectedModel);
-  } catch (error) {
-    console.error('Error loading selected model:', error);
-  }
-}
-
-// Event Listeners Setup
 function setupEventListeners() {
-  const apiKeyInput = document.getElementById('apiKey');
-  const addPromptButton = document.getElementById('addPrompt');
-  const savePromptsButton = document.getElementById('savePrompts');
-  const saveApiKeyButton = document.getElementById('saveApiKey');
-  const exportSettingsButton = document.getElementById('exportSettings');
-  const importSettingsButton = document.getElementById('importSettings'); // the visible button
-  const importFileInput = document.getElementById('importFile'); // the hidden file input
-  const modelSelect = document.getElementById('modelSelect');
+  Object.entries(eventMap).forEach(([id, { event, handler }]) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener(event, handler);
+    }
+  });
 
-  if (saveApiKeyButton) {
-    saveApiKeyButton.addEventListener('click', saveApiKey);
-  }
-
-  if (apiKeyInput) {
-    apiKeyInput.addEventListener('change', () => saveApiKey());
-  }
-
-  if (addPromptButton) {
-    addPromptButton.addEventListener('click', addNewPrompt);
-  }
-
-  if (savePromptsButton) {
-    savePromptsButton.addEventListener('click', savePrompts);
-  }
-
-  if (exportSettingsButton) {
-    exportSettingsButton.addEventListener('click', exportSettings);
-  }
-
+  // Special case for import functionality
+  const importSettingsButton = document.getElementById('importSettings');
+  const importFileInput = document.getElementById('importFile');
   if (importSettingsButton && importFileInput) {
-    importSettingsButton.addEventListener('click', () => {
-      importFileInput.click();
-    });
+    importSettingsButton.addEventListener('click', () => importFileInput.click());
     importFileInput.addEventListener('change', importSettings);
-  }
-
-  if (modelSelect) {
-    modelSelect.addEventListener('change', saveSelectedModel);
   }
 }
 
@@ -569,8 +484,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Confirm before leaving with unsaved changes
 window.addEventListener('beforeunload', (e) => {
-  if (hasUnsavedChanges) {
+  if (State.hasUnsavedChanges) {
     e.preventDefault();
     e.returnValue = '';
   }
 });
+
+// Function to populate the model selection dropdown
+async function populateModelDropdown() {
+  const modelSelect = document.getElementById('modelSelect');
+  if (!modelSelect) return;
+
+  const models = await handleModel('fetch');
+  
+  // Pulisci le opzioni esistenti
+  modelSelect.innerHTML = '';
+  
+  // Aggiungi l'opzione di default
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Select a model';
+  modelSelect.appendChild(defaultOption);
+
+  models.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    modelSelect.appendChild(option);
+  });
+
+  // Imposta il modello selezionato
+  if (State.selectedModel) {
+    modelSelect.value = State.selectedModel;
+  }
+}
+
+// Function to load the selected model from storage
+async function loadSelectedModel() {
+  try {
+    const result = await Storage.get(['selectedModel']);
+    State.selectedModel = result.selectedModel || '';
+    console.log('Loaded selected model:', State.selectedModel);
+  } catch (error) {
+    console.error('Error loading selected model:', error);
+  }
+}
