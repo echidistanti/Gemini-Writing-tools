@@ -637,6 +637,16 @@ async function showChatWindow(tab, initialMessage = '', initialResponse = '') {
           color: 'var(--gpt-text-color)'
         });
 
+        // Add model name
+        const modelName = document.createElement('div');
+        modelName.textContent = `Model: ${state.selectedModel || DEFAULT_MODEL}`;
+        Object.assign(modelName.style, {
+          fontSize: '10px',
+          color: '#999',
+          marginLeft: '8px'
+        });
+        title.appendChild(modelName);
+
         // Add close button
         const closeButton = document.createElement('button');
         closeButton.innerHTML = '✕';
