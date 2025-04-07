@@ -90,13 +90,14 @@ function backupStorage() {
 // Export function - simplified for JSON
 async function exportSettings() {
   try {
-    const settings = await chrome.storage.sync.get(['apiKey', 'customPrompts']);
+    const settings = await chrome.storage.sync.get(['apiKey', 'customPrompts', 'selectedModel']);
     const exportData = {
       version: '1.0',
       timestamp: new Date().toISOString(),
       settings: {
         customPrompts: settings.customPrompts || [],
-        apiKey: settings.apiKey || ''
+        apiKey: settings.apiKey || '',
+        selectedModel: settings.selectedModel || '' // Added selectedModel
       }
     };
 
@@ -142,7 +143,8 @@ async function importSettings(event) {
     // Save settings to chrome.storage
     await chrome.storage.sync.set({
       apiKey: importedData.settings.apiKey || '',
-      customPrompts: importedData.settings.customPrompts || []
+      customPrompts: importedData.settings.customPrompts || [],
+      selectedModel: importedData.settings.selectedModel || '' // Added selectedModel
     });
 
     // Reload settings and update UI if needed
