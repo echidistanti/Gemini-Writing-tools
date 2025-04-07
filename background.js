@@ -236,7 +236,8 @@ async function processText(text, promptText, tab) {
     });
 
     // Make API request with Gemini format
-    const response = await fetch(`${CONFIG.getApiEndpoint(state.selectedModel)}?key=${state.apiKey}`, {
+    const modelToUse = state.selectedModel || DEFAULT_MODEL; // Use selected model or default
+    const response = await fetch(`${CONFIG.getApiEndpoint(modelToUse)}?key=${state.apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -381,7 +382,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }]
         }];
 
-        const response = await fetch(`${CONFIG.getApiEndpoint(state.selectedModel)}?key=${state.apiKey}`, {
+        const modelToUse = state.selectedModel || DEFAULT_MODEL; // Use selected model or default
+        const response = await fetch(`${CONFIG.getApiEndpoint(modelToUse)}?key=${state.apiKey}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
